@@ -140,7 +140,12 @@ int main()
     cv::Mat imageBGR = cv::imread(imageFilepath, cv::IMREAD_COLOR);
     cv::Mat imageRGB;
     cv::Mat imageRGBFloat;
-    cv::Mat preprocessedImage;
+    cv::Mat blob;
+
+    std::vector<cv::Mat> inputImages;
+    std::vector<cv::Mat> outputImgs;
+    cv::Mat upscaledImageBGR;
+    cv::Mat upscaledImageBGR8U;
 
     int width = imageBGR.cols;
     int height = imageBGR.rows;
@@ -153,8 +158,8 @@ int main()
     cv::cvtColor(imageBGR, imageRGB, cv::COLOR_BGR2RGB);
     imageRGB.convertTo(imageRGBFloat, CV_32F, 1.0f / 255.0f);
 
-    std::vector<cv::Mat> inputImages{imageRGBFloat};
-    cv::Mat blob = cv::dnn::blobFromImages(inputImages);
+    inputImages.push_back(imageRGBFloat);
+    blob = cv::dnn::blobFromImages(inputImages);
 
     size_t inputTensorSize = vectorProduct(inputDims);
     size_t outputTensorSize = vectorProduct(outputDims);
@@ -189,13 +194,9 @@ int main()
         std::cout << "Inference time: " << fp_ms.count() << " ms" << std::endl;
     }
 
-    std::vector<cv::Mat> outputImgs;
     cv::dnn::imagesFromBlob(upscaledBlob, outputImgs);
-
-    cv::Mat upscaledImageBGR;
     cv::cvtColor(outputImgs[0], upscaledImageBGR, cv::COLOR_RGB2BGR);
    
-    cv::Mat upscaledImageBGR8U;
     upscaledImageBGR.convertTo(upscaledImageBGR8U, CV_8UC3, 255.0f);
     cv::imwrite(outputFilepath, upscaledImageBGR8U);
 }
