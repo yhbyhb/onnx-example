@@ -2,6 +2,9 @@
 //
 
 
+#include <dxgi.h>
+
+#include <dml_provider_factory.h>
 #include <onnxruntime_cxx_api.h>
 
 #include <opencv2/dnn/dnn.hpp>
@@ -56,7 +59,24 @@ int main()
     std::string imageFilepath{"sample.jpg"};
     std::string outputFilepath{"sample_upscaled.jpg"};
 
-    const Ort::SessionOptions session_options;
+
+    UINT i = 0;
+    IDXGIAdapter* pAdapter;
+    std::vector <IDXGIAdapter*> vAdapters;
+
+    IDXGIFactory* pFactory;
+    HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&pFactory));
+
+        
+    while (pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND)
+    {
+        vAdapters.push_back(pAdapter);
+        ++i;
+    }
+
+    Ort::SessionOptions session_options;
+
+    OrtSessionOptionsAppendExecutionProvider_DML(session_options, 1);
 
     Ort::Session session(env, model_path.c_str(), session_options);
 
@@ -147,14 +167,17 @@ int main()
         outputDims.data(), outputDims.size()));
 
 
-    //measure inference time
-    auto start = std::chrono::high_resolution_clock::now();
-    session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
-        inputTensors.data(), 1 /*Number of inputs*/, outputNames.data(),
-        outputTensors.data(), 1 /*Number of outputs*/);
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> fp_ms = end - start;
-    std::cout << "Inference time: " << fp_ms.count() << " ms" << std::endl;
+    for (size_t i = 0; i < 10; i++)
+    {
+        //measure inference time
+        auto start = std::chrono::high_resolution_clock::now();
+        session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
+            inputTensors.data(), 1 /*Number of inputs*/, outputNames.data(),
+            outputTensors.data(), 1 /*Number of outputs*/);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> fp_ms = end - start;
+        std::cout << "Inference time: " << fp_ms.count() << " ms" << std::endl;
+    }
 
     std::vector<float> outputRGB(outputTensorSize);
 
