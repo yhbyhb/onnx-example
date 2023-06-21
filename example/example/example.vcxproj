@@ -115,7 +115,7 @@
       <AdditionalDependencies>dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(ProjectDir)sample.jpg $(OutDir) /Y
+      <Command>xcopy $(ProjectDir)sample.* $(OutDir) /Y
 xcopy $(ProjectDir)realesr-general-x4v3.onnx $(OutDir) /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -138,7 +138,7 @@ xcopy $(ProjectDir)realesr-general-x4v3.onnx $(OutDir) /Y</Command>
       <AdditionalDependencies>dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(ProjectDir)sample.jpg $(OutDir) /Y
+      <Command>xcopy $(ProjectDir)sample.* $(OutDir) /Y
 xcopy $(ProjectDir)realesr-general-x4v3.onnx $(OutDir) /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

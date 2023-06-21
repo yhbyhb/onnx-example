@@ -138,12 +138,11 @@ int main()
     std::cout << "Output Dimensions: " << outputDims << std::endl;
 
     cv::Mat imageBGR = cv::imread(imageFilepath, cv::IMREAD_COLOR);
+    cv::Mat imageBGRFloat;
     cv::Mat imageRGB;
-    cv::Mat imageRGBFloat;
     cv::Mat blob;
 
-    std::vector<cv::Mat> inputImages;
-    std::vector<cv::Mat> outputImgs;
+
     cv::Mat upscaledImageBGR;
     cv::Mat upscaledImageBGR8U;
 
@@ -155,48 +154,57 @@ int main()
     outputDims.at(2) = height * scale;
     outputDims.at(3) = width * scale;
 
-    cv::cvtColor(imageBGR, imageRGB, cv::COLOR_BGR2RGB);
-    imageRGB.convertTo(imageRGBFloat, CV_32F, 1.0f / 255.0f);
-
-    inputImages.push_back(imageRGBFloat);
-    blob = cv::dnn::blobFromImages(inputImages);
-
-    size_t inputTensorSize = vectorProduct(inputDims);
-    size_t outputTensorSize = vectorProduct(outputDims);
-
-    std::vector<int> outDims{batchSize, channel, height* scale, width* scale};
-    cv::Mat upscaledBlob(outDims, CV_32F);
-
-    std::vector<const char*> inputNames{inputName.get()};
-    std::vector<const char*> outputNames{outputName.get()};
-    std::vector<Ort::Value> inputTensors;
-    std::vector<Ort::Value> outputTensors;
-
-    Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(
-        OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
-
-    inputTensors.push_back(Ort::Value::CreateTensor<float>(
-        memoryInfo, (float*)blob.data, inputTensorSize, inputDims.data(),
-        inputDims.size()));
-    outputTensors.push_back(Ort::Value::CreateTensor<float>(
-        memoryInfo, (float*)upscaledBlob.data, outputTensorSize,
-        outputDims.data(), outputDims.size()));
+    imageBGR.convertTo(imageBGRFloat, CV_32F, 1.0f / 255.0f);
 
     for (size_t i = 0; i < 10; i++)
     {
+        std::vector<cv::Mat> inputImages;
+        std::vector<cv::Mat> outputImgs;
+
+        auto start_upscale = std::chrono::high_resolution_clock::now();
+        cv::cvtColor(imageBGRFloat, imageRGB, cv::COLOR_BGR2RGB);
+
+        inputImages.push_back(imageRGB);
+        blob = cv::dnn::blobFromImages(inputImages);
+
+        size_t inputTensorSize = vectorProduct(inputDims);
+        size_t outputTensorSize = vectorProduct(outputDims);
+
+        std::vector<int> outDims{batchSize, channel, height* scale, width* scale};
+        cv::Mat upscaledBlob(outDims, CV_32F);
+
+        std::vector<const char*> inputNames{inputName.get()};
+        std::vector<const char*> outputNames{outputName.get()};
+        std::vector<Ort::Value> inputTensors;
+        std::vector<Ort::Value> outputTensors;
+
+        Ort::MemoryInfo memoryInfo = Ort::MemoryInfo::CreateCpu(
+            OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
+
+        inputTensors.push_back(Ort::Value::CreateTensor<float>(
+            memoryInfo, (float*)blob.data, inputTensorSize, inputDims.data(),
+            inputDims.size()));
+        outputTensors.push_back(Ort::Value::CreateTensor<float>(
+            memoryInfo, (float*)upscaledBlob.data, outputTensorSize,
+            outputDims.data(), outputDims.size()));
+
+
         //measure inference time
         auto start = std::chrono::high_resolution_clock::now();
         session.Run(Ort::RunOptions{nullptr}, 
             inputNames.data(),  inputTensors.data(),  batchSize, 
-            outputNames.data(), outputTensors.data(), batchSize);
+            outputNames.data(), outputTensors.data(), batchSize);    
         auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> fp_ms = end - start;
-        std::cout << "Inference time: " << fp_ms.count() << " ms" << std::endl;
-    }
+        std::chrono::duration<double, std::milli> inference_ms = end - start;
 
-    cv::dnn::imagesFromBlob(upscaledBlob, outputImgs);
-    cv::cvtColor(outputImgs[0], upscaledImageBGR, cv::COLOR_RGB2BGR);
-   
+        cv::dnn::imagesFromBlob(upscaledBlob, outputImgs);
+        cv::cvtColor(outputImgs[0], upscaledImageBGR, cv::COLOR_RGB2BGR);
+        auto end_upscale = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> upscale_ms = end_upscale - start_upscale;
+
+        std::cout << "Inference time: " << inference_ms.count() << " ms" << std::endl;
+        std::cout << "Upscale time: " << upscale_ms.count() << " ms" << std::endl;
+    }
     upscaledImageBGR.convertTo(upscaledImageBGR8U, CV_8UC3, 255.0f);
     cv::imwrite(outputFilepath, upscaledImageBGR8U);
 }
