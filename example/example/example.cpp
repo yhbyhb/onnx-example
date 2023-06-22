@@ -54,29 +54,44 @@ int main()
     const int channel = 3;
     const int64_t batchSize = 1;
 
-    const Ort::Env env;
     std::wstring model_path{L"realesr-general-x4v3.onnx"};
     std::string imageFilepath{"sample.jpg"};
     std::string outputFilepath{"sample_upscaled.jpg"};
 
-
-    UINT i = 0;
+    UINT deviceIndex = 0;
     IDXGIAdapter* pAdapter;
     std::vector <IDXGIAdapter*> vAdapters;
 
     IDXGIFactory* pFactory;
     HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&pFactory));
-
         
-    while (pFactory->EnumAdapters(i, &pAdapter) != DXGI_ERROR_NOT_FOUND)
+    while (pFactory->EnumAdapters(deviceIndex, &pAdapter) != DXGI_ERROR_NOT_FOUND)
     {
+        DXGI_ADAPTER_DESC desc;
+        pAdapter->GetDesc(&desc);
+
+        std::wstring deviceDescription(desc.Description);
+        if (deviceDescription.find(L"NVIDIA") != std::string::npos || (deviceDescription.find(L"AMD") != std::string::npos))
+        {
+            std::wcout << "Found NVIDIA or AMD GPU: " << deviceDescription << ". deviceIndex : " << deviceIndex << std::endl;
+            break;
+        }
+        else
+        {
+            std::wcout << "Skipping non-NVIDIA or non-AMD GPU: " << deviceDescription << std::endl;
+        }
+
         vAdapters.push_back(pAdapter);
-        ++i;
+        ++deviceIndex;
     }
 
+    const Ort::Env env;
     Ort::SessionOptions session_options;
 
-    OrtSessionOptionsAppendExecutionProvider_DML(session_options, 1);
+    auto result = OrtSessionOptionsAppendExecutionProvider_DML(session_options, deviceIndex);
+
+    //default
+    //session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
     Ort::Session session(env, model_path.c_str(), session_options);
 
