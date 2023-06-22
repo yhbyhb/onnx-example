@@ -153,18 +153,14 @@ int main()
     cv::cvtColor(imageBGR, imageRGB, cv::COLOR_BGR2RGB);
     imageRGB.convertTo(imageRGBFloat, CV_32F, 1.0f / 255.0f);
 
-    cv::dnn::blobFromImage(imageRGBFloat, preprocessedImage);
+    std::vector<cv::Mat> inputImages{imageRGBFloat};
+    cv::Mat blob = cv::dnn::blobFromImages(inputImages);
 
     size_t inputTensorSize = vectorProduct(inputDims);
-    std::vector<float> inputTensorValues(inputTensorSize);
-    // Make copies of the same image input.
-
-    std::copy(preprocessedImage.begin<float>(),
-        preprocessedImage.end<float>(),
-        inputTensorValues.begin());
-
     size_t outputTensorSize = vectorProduct(outputDims);
-    std::vector<float> outputTensorValues(outputTensorSize);
+
+    std::vector<int> outDims{batchSize, channel, height* scale, width* scale};
+    cv::Mat upscaledBlob(outDims, CV_32F);
 
     std::vector<const char*> inputNames{inputName.get()};
     std::vector<const char*> outputNames{outputName.get()};
@@ -175,45 +171,30 @@ int main()
         OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
 
     inputTensors.push_back(Ort::Value::CreateTensor<float>(
-        memoryInfo, inputTensorValues.data(), inputTensorSize, inputDims.data(),
+        memoryInfo, (float*)blob.data, inputTensorSize, inputDims.data(),
         inputDims.size()));
     outputTensors.push_back(Ort::Value::CreateTensor<float>(
-        memoryInfo, outputTensorValues.data(), outputTensorSize,
+        memoryInfo, (float*)upscaledBlob.data, outputTensorSize,
         outputDims.data(), outputDims.size()));
-
 
     for (size_t i = 0; i < 10; i++)
     {
         //measure inference time
         auto start = std::chrono::high_resolution_clock::now();
-        session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
-            inputTensors.data(), 1 /*Number of inputs*/, outputNames.data(),
-            outputTensors.data(), 1 /*Number of outputs*/);
+        session.Run(Ort::RunOptions{nullptr}, 
+            inputNames.data(),  inputTensors.data(),  batchSize, 
+            outputNames.data(), outputTensors.data(), batchSize);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> fp_ms = end - start;
         std::cout << "Inference time: " << fp_ms.count() << " ms" << std::endl;
     }
 
-    std::vector<float> outputRGB(outputTensorSize);
-
+    std::vector<cv::Mat> outputImgs;
+    cv::dnn::imagesFromBlob(upscaledBlob, outputImgs);
 
     cv::Mat upscaledImageBGR;
-
-    for (size_t h = 0; h < height * scale; h++)
-    {
-        for (size_t w = 0; w < width * scale; w++)
-        {   
-            for (size_t c = 0; c < channel; c++)
-            {
-                outputRGB[c + w * channel + h * width * scale * channel] =
-                    outputTensorValues[c * height * scale * width * scale + h * width * scale + w];
-            }
-        }
-    }
-
-    cv::Mat upscaledImageRGB(height * scale, width * scale, CV_32FC3, outputRGB.data());
-    cv::cvtColor(upscaledImageRGB, upscaledImageBGR, cv::COLOR_RGB2BGR);
-    
+    cv::cvtColor(outputImgs[0], upscaledImageBGR, cv::COLOR_RGB2BGR);
+   
     cv::Mat upscaledImageBGR8U;
     upscaledImageBGR.convertTo(upscaledImageBGR8U, CV_8UC3, 255.0f);
     cv::imwrite(outputFilepath, upscaledImageBGR8U);
