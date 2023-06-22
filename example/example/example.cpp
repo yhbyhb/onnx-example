@@ -4,7 +4,6 @@
 
 #include <dxgi.h>
 
-#include <dml_provider_factory.h>
 #include <onnxruntime_cxx_api.h>
 
 #include <opencv2/dnn/dnn.hpp>
@@ -85,10 +84,20 @@ int main()
         ++deviceIndex;
     }
 
+    auto providers = Ort::GetAvailableProviders();
+    for (auto& provider : providers)
+    {
+        std::cout << "Available provider: " << provider << std::endl;
+    }
+
     const Ort::Env env;
     Ort::SessionOptions session_options;
 
-    auto result = OrtSessionOptionsAppendExecutionProvider_DML(session_options, deviceIndex);
+    OrtCUDAProviderOptions o;
+    memset(&o, 0, sizeof(o));
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+
+    Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(session_options, &o);
 
     //default
     //session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);

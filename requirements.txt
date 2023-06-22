@@ -1,2 +1,2 @@
 opencv-python
-onnxruntime-directml
+onnxruntime-gpu

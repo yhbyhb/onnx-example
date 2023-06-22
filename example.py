@@ -10,7 +10,10 @@ img = cv2.imread("sample.jpg")
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 input_data_normalized = img.astype(np.float32) / 255.0
 
-sess = ort.InferenceSession('realesr-general-x4v3.onnx', providers=['DmlExecutionProvider'], provider_options=[{'device_id': 1}])
+providers = [("CUDAExecutionProvider")]
+
+sess_options = ort.SessionOptions()
+sess = ort.InferenceSession('realesr-general-x4v3.onnx', sess_options=sess_options, providers=providers)
 input_name = sess.get_inputs()[0].name
 output_name = sess.get_outputs()[0].name
 
