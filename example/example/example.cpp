@@ -58,13 +58,13 @@ int main()
     std::string imageFilepath{"sample.jpg"};
     std::string outputFilepath{"sample_upscaled.jpg"};
 
+    ////////////////////////////////////////
+    // Enumerate GPUs and pick the first NVIDIA or AMD GPU.
     UINT deviceIndex = 0;
     IDXGIAdapter* pAdapter;
-    std::vector <IDXGIAdapter*> vAdapters;
-
     IDXGIFactory* pFactory;
-    HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&pFactory));
-        
+
+    HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&pFactory));        
     while (pFactory->EnumAdapters(deviceIndex, &pAdapter) != DXGI_ERROR_NOT_FOUND)
     {
         DXGI_ADAPTER_DESC desc;
@@ -81,19 +81,26 @@ int main()
             std::wcout << "Skipping non-NVIDIA or non-AMD GPU: " << deviceDescription << std::endl;
         }
 
-        vAdapters.push_back(pAdapter);
         ++deviceIndex;
     }
 
-    const Ort::Env env;
-    Ort::SessionOptions session_options;
+    pFactory->Release();
 
-    auto result = OrtSessionOptionsAppendExecutionProvider_DML(session_options, deviceIndex);
+    ////////////////////////////////////////
+    // Get API, and setup environment.
+    OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
+    const OrtDmlApi* ortDmlApi;
+    ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi));
+    Ort::Env environment(ORT_LOGGING_LEVEL_WARNING, "DirectML_Direct3D_TensorAllocation_Test"); // Note ORT_LOGGING_LEVEL_VERBOSE is useful too.
 
-    //default
-    //session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+    ////////////////////////////////////////
+    // Set model-specific session options.
+    Ort::SessionOptions sessionOptions;
+    sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL); // For DML EP
+    sessionOptions.DisableMemPattern(); // For DML EP
+    ortDmlApi->SessionOptionsAppendExecutionProvider_DML(sessionOptions, deviceIndex);
 
-    Ort::Session session(env, model_path.c_str(), session_options);
+    Ort::Session session(environment, model_path.c_str(), sessionOptions);
 
     Ort::AllocatorWithDefaultOptions allocator;
 
