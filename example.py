@@ -7,7 +7,13 @@ print(ort.__version__)
 
 input_filename = "sample.jpg"
 output_filename = "sample_upscaled.jpg"
-model_name ='realesr-general-x4v3-fp16.onnx'
+model_name ='realesr-general-x4v3'
+
+half = True
+if half:
+    model_filename = model_name + '-fp16' + '.onnx'
+else:
+    model_filename = model_name + '.onnx'
 
 img = cv2.imread(input_filename)
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -23,13 +29,15 @@ providers = [provider]
 
 sess_options = ort.SessionOptions()
 # sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-sess = ort.InferenceSession(model_name, sess_options=sess_options, providers=providers, provider_options=[{'device_id': 1}])
+sess = ort.InferenceSession(model_filename, sess_options=sess_options, providers=providers, provider_options=[{'device_id': 1}])
 input_name = sess.get_inputs()[0].name
 output_name = sess.get_outputs()[0].name
 
 # measure time onnx
 for i in range(10):
-    input_data_blob = input_data_normalized.transpose(2, 0, 1)[np.newaxis, ...].astype(np.float16)
+    input_data_blob = input_data_normalized.transpose(2, 0, 1)[np.newaxis, ...]
+    if half:
+        input_data_blob = input_data_blob.astype(np.float16)
     start_time = time.time()
     output_data_blob = sess.run([output_name], {input_name: input_data_blob})[0]
     end_time = time.time()
