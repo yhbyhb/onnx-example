@@ -7,14 +7,19 @@
 #include <dml_provider_factory.h>
 #include <onnxruntime_cxx_api.h>
 
+#include <fmt/base.h>
+#include <fmt/ranges.h>
 #include <opencv2/dnn/dnn.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include <spdlog/spdlog.h>
+#include <unicode/unistr.h>
 
 #include <exception>
 #include <iostream>
 #include <numeric>
 #include <optional>
+#include <vector>
 
 
 template <typename T>
@@ -23,30 +28,31 @@ T vectorProduct(const std::vector<T>& v)
     return accumulate(v.begin(), v.end(), 1, std::multiplies<T>());
 }
 
-
-/**
- * @brief Operator overloading for printing vectors
- * @tparam T
- * @param os
- * @param v
- * @return std::ostream&
- */
-template <typename T>
-std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
+// ───────────────────────────────────────────────────────────────
+//  UTF-16 (std::wstring)  →  UTF-8 (std::string)
+// ───────────────────────────────────────────────────────────────
+inline std::string wstring_to_utf8(const std::wstring& wstr)
 {
-    os << "[";
-    for (int i = 0; i < v.size(); ++i)
-    {
-        os << v[i];
-        if (i != v.size() - 1)
-        {
-            os << ", ";
-        }
-    }
-    os << "]";
-    return os;
+    // Windows: wchar_t is 16-bit, identical to ICU's UChar.
+    const auto* src = reinterpret_cast<const UChar*>(wstr.data());
+    icu::UnicodeString ustr(false, src, static_cast<int32_t>(wstr.length()));
+
+    std::string utf8;
+    ustr.toUTF8String(utf8);            // locale-independent, lossless
+    return utf8;
 }
 
+// ───────────────────────────────────────────────────────────────
+//  UTF-8 (std::string)  →  UTF-16 (std::wstring)
+// ───────────────────────────────────────────────────────────────
+inline std::wstring utf8_to_wstring(const std::string& utf8)
+{
+    icu::UnicodeString ustr = icu::UnicodeString::fromUTF8(utf8);
+    const auto* buf = ustr.getBuffer(); // UChar*
+    return std::wstring(
+        reinterpret_cast<const wchar_t*>(buf),
+        static_cast<size_t>(ustr.length()));
+}
 
 int main()
 {
@@ -70,15 +76,15 @@ int main()
         DXGI_ADAPTER_DESC desc;
         pAdapter->GetDesc(&desc);
 
-        std::wstring deviceDescription(desc.Description);
-        if (deviceDescription.find(L"NVIDIA") != std::string::npos || (deviceDescription.find(L"AMD") != std::string::npos))
+        std::string deviceDesc = wstring_to_utf8(desc.Description);
+        if (deviceDesc.find("NVIDIA") != std::string::npos || (deviceDesc.find("AMD") != std::string::npos))
         {
-            std::wcout << "Found NVIDIA or AMD GPU: " << deviceDescription << ". deviceIndex : " << deviceIndex << std::endl;
+            spdlog::info("Found NVIDIA or AMD GPU: {}. deviceIndex : {}", deviceDesc, deviceIndex);
             break;
         }
         else
         {
-            std::wcout << "Skipping non-NVIDIA or non-AMD GPU: " << deviceDescription << std::endl;
+            spdlog::warn("Skipping non-NVIDIA or non-AMD GPU: {}. deviceIndex : {}", deviceDesc, deviceIndex);
         }
 
         ++deviceIndex;
@@ -117,8 +123,7 @@ int main()
     std::vector<int64_t> inputDims = inputTensorInfo.GetShape();
     if (inputDims.at(0) == -1)
     {
-        std::cout << "Got dynamic batch size. Setting input batch size to "
-            << batchSize << "." << std::endl;
+        spdlog::info("Got dynamic batch size. Setting input batch size to {}.", batchSize);
         inputDims.at(0) = batchSize;
     }
 
@@ -130,19 +135,18 @@ int main()
     std::vector<int64_t> outputDims = outputTensorInfo.GetShape();
     if (outputDims.at(0) == -1)
     {
-        std::cout << "Got dynamic batch size. Setting output batch size to "
-            << batchSize << "." << std::endl;
+        spdlog::info("Got dynamic batch size. Setting output batch size to {}.", batchSize);
         outputDims.at(0) = batchSize;
     }
 
-    std::cout << "Number of Input Nodes: " << numInputNodes << std::endl;
-    std::cout << "Number of Output Nodes: " << numOutputNodes << std::endl;
-    std::cout << "Input Name: " << inputName << std::endl;
-    std::cout << "Input Type: " << inputType << std::endl;
-    std::cout << "Input Dimensions: " << inputDims << std::endl;
-    std::cout << "Output Name: " << outputName << std::endl;
-    std::cout << "Output Type: " << outputType << std::endl;
-    std::cout << "Output Dimensions: " << outputDims << std::endl;
+    spdlog::info("Number of Input Nodes: {}", numInputNodes);
+    spdlog::info("Number of Output Nodes: {}", numOutputNodes);
+    spdlog::info("Input Name: {}", inputName.get());
+    spdlog::info("Input Type: {}", static_cast<int>(inputType));
+    spdlog::info("Input Dimensions: {}", inputDims);
+    spdlog::info("Output Name: {}", outputName.get());
+    spdlog::info("Output Type: {}", static_cast<int>(outputType));
+    spdlog::info("Output Dimensions: {}", outputDims);
 
     cv::Mat imageBGR = cv::imread(imageFilepath, cv::IMREAD_COLOR);
     cv::Mat imageBGRFloat;
@@ -209,8 +213,8 @@ int main()
         auto end_upscale = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> upscale_ms = end_upscale - start_upscale;
 
-        std::cout << "Inference time: " << inference_ms.count() << " ms" << std::endl;
-        std::cout << "Upscale time: " << upscale_ms.count() << " ms" << std::endl;
+        spdlog::info("Inference time: {} ms", inference_ms.count());
+        spdlog::info("Upscale time: {} ms", upscale_ms.count());
     }
     upscaledImageBGR.convertTo(upscaledImageBGR8U, CV_8UC3, 255.0f);
     cv::imwrite(outputFilepath, upscaledImageBGR8U);
