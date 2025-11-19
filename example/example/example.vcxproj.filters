@@ -24,6 +24,8 @@
     <None Include="realesr-general-x4v3.onnx">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\vcpkg.json" />
+    <None Include="..\vcpkg-configuration.json" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="sample.jpg">
