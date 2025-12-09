@@ -97,7 +97,7 @@ int main()
         std::cout << "Available provider: " << provider << std::endl;
     }
 
-    const Ort::Env environment;
+    Ort::Env env = Ort::Env(OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING, "Default");
     Ort::SessionOptions sessionOptions;
 
     OrtCUDAProviderOptions o;
@@ -105,7 +105,7 @@ int main()
     const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
 
     Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(sessionOptions, &o);
-    Ort::Session session(environment, model_path.c_str(), sessionOptions);
+    Ort::Session session(env, model_path.c_str(), sessionOptions);
 
     Ort::AllocatorWithDefaultOptions allocator;
 

@@ -20,7 +20,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
     <None Include="realesr-general-x4v3.onnx">
       <Filter>Resource Files</Filter>
     </None>
