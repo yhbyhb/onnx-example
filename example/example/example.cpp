@@ -4,7 +4,6 @@
 
 #include <dxgi.h>
 
-#include <dml_provider_factory.h>
 #include <onnxruntime_cxx_api.h>
 
 #include <fmt/base.h>
@@ -92,20 +91,20 @@ int main()
 
     pFactory->Release();
 
-    ////////////////////////////////////////
-    // Get API, and setup environment.
-    OrtApi const& ortApi = Ort::GetApi(); // Uses ORT_API_VERSION
-    const OrtDmlApi* ortDmlApi;
-    ortApi.GetExecutionProviderApi("DML", ORT_API_VERSION, reinterpret_cast<const void**>(&ortDmlApi));
-    Ort::Env environment(ORT_LOGGING_LEVEL_WARNING, "DirectML_Direct3D_TensorAllocation_Test"); // Note ORT_LOGGING_LEVEL_VERBOSE is useful too.
+    auto providers = Ort::GetAvailableProviders();
+    for (auto& provider : providers)
+    {
+        std::cout << "Available provider: " << provider << std::endl;
+    }
 
-    ////////////////////////////////////////
-    // Set model-specific session options.
+    const Ort::Env environment;
     Ort::SessionOptions sessionOptions;
-    sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL); // For DML EP
-    sessionOptions.DisableMemPattern(); // For DML EP
-    ortDmlApi->SessionOptionsAppendExecutionProvider_DML(sessionOptions, deviceIndex);
 
+    OrtCUDAProviderOptions o;
+    memset(&o, 0, sizeof(o));
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+
+    Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(sessionOptions, &o);
     Ort::Session session(environment, model_path.c_str(), sessionOptions);
 
     Ort::AllocatorWithDefaultOptions allocator;

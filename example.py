@@ -19,7 +19,7 @@ img = cv2.imread(input_filename)
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 input_data_normalized = img.astype(np.float32) / 255.0
 
-provider = "DmlExecutionProvider"
+provider = "CUDAExecutionProvider"
 
 if not provider in ort.get_available_providers():
     print(f"provider {provider} not found in {ort.get_available_providers()}")
@@ -28,8 +28,7 @@ if not provider in ort.get_available_providers():
 providers = [provider]
 
 sess_options = ort.SessionOptions()
-# sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-sess = ort.InferenceSession(model_filename, sess_options=sess_options, providers=providers, provider_options=[{'device_id': 1}])
+sess = ort.InferenceSession(model_filename, sess_options=sess_options, providers=providers)
 input_name = sess.get_inputs()[0].name
 output_name = sess.get_outputs()[0].name
 
